@@ -1,0 +1,11 @@
+[
+  {"name":"OpenAI News","url":"https://openai.com/news/rss.xml","category":"yapay-zeka"},
+  {"name":"Google AI","url":"https://blog.google/technology/ai/rss/","category":"yapay-zeka"},
+  {"name":"Microsoft AI","url":"https://blogs.microsoft.com/ai/feed/","category":"yapay-zeka"},
+  {"name":"TechCrunch AI","url":"https://techcrunch.com/category/artificial-intelligence/feed/","category":"yapay-zeka"},
+  {"name":"Hacker News","url":"https://hnrss.org/frontpage","category":"teknoloji"},
+  {"name":"GitHub Blog","url":"https://github.blog/feed/","category":"yazilim"},
+  {"name":"Power Automate Blog","url":"https://www.microsoft.com/en-us/power-platform/blog/power-automate/feed/","category":"otomasyon"},
+  {"name":"Supply Chain Digital","url":"https://supplychaindigital.com/rss.xml","category":"lojistik"}
+]
+
