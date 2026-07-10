@@ -58,6 +58,49 @@ def ai_action(choice, item):
     prompt=f"Aşağıdaki haberi Türkçe olarak özetle. Önce 2-3 cümlelik ana özet, ardından en fazla 5 maddede önemli noktalar ve son olarak 'LinkedIn için çıkarım' başlığı altında tek bir uygulanabilir fikir ver. Metinde olmayan bilgi ekleme.\n\nBaşlık: {item['title']}\nKaynak: {item['url']}\n\n{body}"
     return "📝 Türkçe özet", gemini(prompt)
 
+
+def style_menu(chat_id, article_id):
+    keyboard={"inline_keyboard":[
+        [{"text":"🙂 Kişisel & samimi","callback_data":f"draft_personal:{article_id}"},{"text":"💼 Profesyonel","callback_data":f"draft_professional:{article_id}"}],
+        [{"text":"🧠 Teknik & analitik","callback_data":f"draft_technical:{article_id}"},{"text":"⚡ Kısa & çarpıcı","callback_data":f"draft_short:{article_id}"}]
+    ]}
+    requests.post(f"https://api.telegram.org/bot{BOT}/sendMessage",json={"chat_id":chat_id,"text":"Bu haberi LinkedIn’de hangi tarzda paylaşmak istersin?","reply_markup":keyboard},timeout=30).raise_for_status()
+
+def linkedin_draft(style, item):
+    styles={
+        "personal":"Kişisel ve samimi yaz. Bir profesyonelin haberi okuyup kendi deneyimiyle ilişkilendirdiği doğal bir ton kullan.",
+        "professional":"Profesyonel, güven veren ve anlaşılır yaz. Kurumsal jargona boğma.",
+        "technical":"Teknik ve analitik yaz. Gelişmenin iş süreçleri, yapay zekâ, otomasyon veya teknoloji açısından somut etkisini açıkla.",
+        "short":"Kısa ve çarpıcı yaz. En fazla 900 karakter kullan; güçlü bir giriş ve net bir çıkarım üret.",
+        "rewrite":"Öncekinden farklı bir açı ve giriş kullanarak dengeli, doğal ve profesyonel yaz."
+    }
+    body=article_text(item)
+    instruction=styles.get(style,styles["professional"])
+    prompt=f"""Aşağıdaki haberden hareketle Türkçe bir LinkedIn paylaşımı hazırla.
+{instruction}
+Kurallar:
+- Haberde olmayan bilgi, sayı veya kişisel deneyim uydurma.
+- İlk cümle dikkat çekici ama clickbait olmasın.
+- Haberi kopyalama; yorumla ve iş dünyası için anlamını açıkla.
+- Okuyucuya doğal bir soru sorarak bitir.
+- En sonda 3-5 alakalı hashtag kullan.
+- Kaynak bağlantısını en sona 'Kaynak: {item['url']}' biçiminde ekle.
+- Yalnızca paylaşılmaya hazır metni ver.
+
+Başlık: {item['title']}
+Haber metni:
+{body}"""
+    return gemini(prompt)
+
+def send_draft(chat_id, article_id, result):
+    if len(result)>3600:
+        result=result[:3550].rsplit(" ",1)[0]+"…"
+    keyboard={"inline_keyboard":[
+        [{"text":"🙂 Daha kişisel","callback_data":f"draft_personal:{article_id}"},{"text":"🧠 Daha teknik","callback_data":f"draft_technical:{article_id}"}],
+        [{"text":"✂️ Daha kısa","callback_data":f"draft_short:{article_id}"},{"text":"🔄 Yeniden yaz","callback_data":f"draft_rewrite:{article_id}"}]
+    ]}
+    requests.post(f"https://api.telegram.org/bot{BOT}/sendMessage",json={"chat_id":chat_id,"text":"✍️ LinkedIn taslağın\n\n"+result,"disable_web_page_preview":True,"reply_markup":keyboard},timeout=30).raise_for_status()
+
 if __name__ == "__main__":
     r=requests.get(f"https://api.telegram.org/bot{BOT}/getUpdates",params={"offset":offset(),"timeout":0},timeout=30); r.raise_for_status()
     updates=r.json().get("result",[])
@@ -66,15 +109,26 @@ if __name__ == "__main__":
         try:
             if query and ":" in query.get("data",""):
                 choice, article_id=query["data"].split(":",1)
-                if choice in {"like","skip","linkedin"}:
+                chat_id=query["message"]["chat"]["id"]
+                if choice in {"like","skip"}:
                     sb_post("feedback?on_conflict=article_id,choice", {"article_id":article_id,"choice":choice}, "resolution=ignore-duplicates,return=minimal")
                     requests.post(f"https://api.telegram.org/bot{BOT}/answerCallbackQuery",json={"callback_query_id":query["id"],"text":"Tercihin kaydedildi ✅"},timeout=30)
+                elif choice=="linkedin":
+                    sb_post("feedback?on_conflict=article_id,choice", {"article_id":article_id,"choice":"linkedin"}, "resolution=ignore-duplicates,return=minimal")
+                    requests.post(f"https://api.telegram.org/bot{BOT}/answerCallbackQuery",json={"callback_query_id":query["id"],"text":"Kaydedildi; şimdi tarzını seç ✍️"},timeout=30)
+                    style_menu(chat_id,article_id)
                 elif choice in {"translate","summarize"}:
                     requests.post(f"https://api.telegram.org/bot{BOT}/answerCallbackQuery",json={"callback_query_id":query["id"],"text":"Hazırlıyorum…"},timeout=30)
                     item=article(article_id)
                     if not item: raise RuntimeError("Haber bulunamadi")
                     heading, result=ai_action(choice,item)
-                    send_chunks(query["message"]["chat"]["id"],heading,result)
+                    send_chunks(chat_id,heading,result)
+                elif choice.startswith("draft_"):
+                    requests.post(f"https://api.telegram.org/bot{BOT}/answerCallbackQuery",json={"callback_query_id":query["id"],"text":"LinkedIn taslağını hazırlıyorum…"},timeout=30)
+                    item=article(article_id)
+                    if not item: raise RuntimeError("Haber bulunamadi")
+                    result=linkedin_draft(choice.removeprefix("draft_"),item)
+                    send_draft(chat_id,article_id,result)
         except Exception as exc:
             print(f"Callback failed: {exc}")
             if query:
