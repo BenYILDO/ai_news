@@ -67,6 +67,6 @@ def send(article, number):
 
 if __name__ == "__main__":
     save(collect())
-    top=sb_get("articles", {"select":"*","telegram_message_id":"is.null","order":"score.desc","limit":"10"})
+    params={"select":"*","order":"score.desc","limit":"10"}\n    if os.environ.get("FORCE_SEND","false").lower()!="true": params["telegram_message_id"]="is.null"\n    top=sb_get("articles", params)
     requests.post(f"https://api.telegram.org/bot{BOT}/sendMessage",json={"chat_id":CHAT,"text":"☀️ Günlük AI & LinkedIn radarın hazır. Seçimlerin yarının listesini iyileştirecek."},timeout=30).raise_for_status()
     for i,a in enumerate(top,1): send(a,i)
