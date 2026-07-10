@@ -59,7 +59,8 @@ def idea(article):
 
 def send(article, number):
     text=f"<b>{number}. {html.escape(article['title'])}</b>\n\n{html.escape(article.get('summary') or 'Özet bulunamadı.')}\n\n💡 <b>LinkedIn açısı:</b> {html.escape(idea(article))}\n\n<a href=\"{html.escape(article['url'])}\">Kaynağı aç</a> · {html.escape(article['source'])}"
-    keyboard={"inline_keyboard":[[{"text":"👍 Beğendim","callback_data":f"like:{article['id']}"},{"text":"👎 Geç","callback_data":f"skip:{article['id']}"}],[{"text":"✍️ LinkedIn'de kullanacağım","callback_data":f"linkedin:{article['id']}"}]]}
+    aid=article["id"]
+    keyboard={"inline_keyboard":[[{"text":"🇹🇷 Türkçe oku","callback_data":f"translate:{aid}"},{"text":"📝 Özetle","callback_data":f"summarize:{aid}"}],[{"text":"👍 Beğendim","callback_data":f"like:{aid}"},{"text":"👎 Geç","callback_data":f"skip:{aid}"}],[{"text":"✍️ LinkedIn'de kullanacağım","callback_data":f"linkedin:{aid}"}]]}
     r=requests.post(f"https://api.telegram.org/bot{BOT}/sendMessage",json={"chat_id":CHAT,"text":text,"parse_mode":"HTML","disable_web_page_preview":True,"reply_markup":keyboard},timeout=30)
     r.raise_for_status(); mid=r.json()["result"]["message_id"]
     sb_patch("articles", {"id":f"eq.{article['id']}"}, {"telegram_message_id":mid})
@@ -69,4 +70,3 @@ if __name__ == "__main__":
     top=sb_get("articles", {"select":"*","telegram_message_id":"is.null","order":"score.desc","limit":"10"})
     requests.post(f"https://api.telegram.org/bot{BOT}/sendMessage",json={"chat_id":CHAT,"text":"☀️ Günlük AI & LinkedIn radarın hazır. Seçimlerin yarının listesini iyileştirecek."},timeout=30).raise_for_status()
     for i,a in enumerate(top,1): send(a,i)
-
